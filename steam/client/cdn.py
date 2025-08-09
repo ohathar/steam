@@ -93,6 +93,7 @@ Reading a file directly from SteamPipe
 
 """
 
+import zstandard as zstd
 from zipfile import ZipFile
 from io import BytesIO
 from collections import OrderedDict, deque
@@ -621,6 +622,14 @@ class CDNClient(object):
                 data = vzdec.decompress(data[12:-9])[:decompressed_size]
                 if crc32(data) != checksum:
                     raise SteamError("VZ: CRC32 checksum doesn't match for decompressed data")
+            elif data[:4] == b'VSZa':
+                MAGIC = b"\x28\xb5\x2f\xfd"
+                i = data.find(MAGIC)
+                if i < 0:
+                    raise ValueError("Zstandard magic not found")
+                payload = data[i:]
+                dctx = zstd.ZstdDecompressor()
+                data = dctx.decompress(payload)
             else:
                 with ZipFile(BytesIO(data)) as zf:
                     data = zf.read(zf.filelist[0])
